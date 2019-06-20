@@ -19,11 +19,7 @@ The workflows described in this topic support the following use cases:
 + Migrating from a single-node or leader-follower plan to highly available (HA) cluster plan.
 + Migrating from an HA cluster plan to single-node or leader-follower plan.
 + Migrating from an off-platform database to MySQL for PCF v2.x.
-
-<p class="note warning"><strong>WARNING</strong>: Migrating large datasets can take several hours.
-Migration of the data is linear, and depends on the hardware being used.
-For example, if X amount of data takes 10 minutes to migrate, then 2X amount of data will take 20 minutes to migrate using the same hardware.
-Do a test migration with small datasets to estimate how long the entire migration will take before migrating larger datasets.</p>
++ Migrating from one availability zone (AZ) to another.
 
 ## <a id='prepare'></a>Prerequisites
 
@@ -37,10 +33,24 @@ To perform the procedures in this topic, you must have the following:
 * MySQL for PCF v2.x installed in the target PCF environment you wish to migrate to.
 * A MySQL for PCF service plan available in the targeted Org and Space you want
   to migrate your data to. The service plan should have the correct topology and
-  resources for your target database.
+  resources for your target database. 
+  Talk to your operator to determine which service plan is appropriate.
+  For more information, see <a href="recommended.html#persistent"> Persistent Disk Usage</a>.
 
 <p class="note"><strong>Note</strong>: To view available service plans, run <code>cf marketplace</code>.
   MySQL for PCF v2.x appears as <code>p.mysql</code> and MySQL for PCF v1.x appears as <code>p-mysql</code>.</p>
+
+### <a id='sizing'></a>Resource Planning
+
+The service plan that you select for your target service instance should have a persistent disk that is:
+
+  * **Single-Node** or **Leader-Follower**: Three times larger than the size of the source data.
+  * **HA Cluster**: Two times larger than the size of the source data.
+
+<p class="note warning"><strong>WARNING</strong>: Migrating large datasets can take several hours.
+Migration of the data is linear, and depends on the hardware being used.
+For example, if X amount of data takes 10 minutes to migrate, then 2X amount of data will take 20 minutes to migrate using the same hardware.
+Do a test migration with small datasets to estimate how long the entire migration will take before migrating larger datasets.</p>
 
 ## <a id='install-plugin'></a>Install the mysql-tools CF CLI Plugin
 
@@ -289,12 +299,8 @@ To migrate your data from off-platform, do the following steps:
     ```
     cf target -o TARGET_ORG -s TARGET_SPACE
     ```
-1. Then, run the following command to ensure your source service instance was
-   shared successfully.
+1. TK video demo instrux here
 
-    ```
-    cf services
-    ```
 1. Stop and unbind all apps that are sending traffic to the source MySQL service
    instance by running the following command for each app:
 
@@ -333,32 +339,10 @@ Run the following command for each app bound to the instance:
     cf mysql-tools migrate SOURCE-INSTANCE V2-PLAN
     ```
     Where:
-    * `SOURCE-INSTANCE` is the name of your source MySQL service instance.
+    * `SOURCE-INSTANCE` is the name of the user-provided service instance that represents your source off-platform MySQL database.
     * `V2-PLAN` is the name of the MySQL for PCF v2 service plan to use for the new MySQL for PCF v2 service instance.
     For example, `db-small`.
     To view available MySQL for PCF v2 service plans, run `cf marketplace` and locate the plans under `p.mysql`.
-
-## <a id='stop-unbind'></a>Stop and Unbind Apps
-
-
-## <a id='migrate-data'></a>Migrate Data
-
-To migrate the data from the source MySQL for PCF service instance to a new destination MySQL for PCF v2.x service instance, use the `cf mysql-tools` plugin.
-
-The `migrate` command of the plugin renames the MySQL for PCF service instance by appending `-old` and gives the original name of the instance to the newly created MySQL for PCF v2.x service instance.
-
-Do the following to migrate data to an instance of the same name:
-
-1. Install the `cf mysql-tools` plugin.
-  Run the following command:
-
-    ```
-    cf install-plugin -r CF-Community "MysqlTools"
-    ```
-
-
-
-Developers can SSH into the app container to examine the logs.
 
 
 ## <a id='validate-data'></a>Validate Data
@@ -422,7 +406,7 @@ Run the following command:
 
 After rebinding and restaging your apps to confirm that migration was successful, Pivotal recommends saving resources by deleting the old database instance.
 
-To perform the deletion, run the following command:
+If your source database is deployed on PCF, perform the deletion by running the following command:
 
   ```
   cf delete-service SOURCE-INSTANCE
