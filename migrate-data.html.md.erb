@@ -19,7 +19,7 @@ To migrate data from a source MySQL instance to a new target MySQL instance in P
   1. Creates a new MySQL for PCF v2.x service instance in the target space.
   1. Copies the source data over to the new service instance.
 
-## <a id='use-cases'></a>Use Cases
+### <a id='use-cases'></a>Use Cases
 
 The workflows described in this topic support the following use cases:
 
@@ -29,6 +29,27 @@ The workflows described in this topic support the following use cases:
 + Migrating from an HA cluster plan to single-node or leader-follower plan.
 + Migrating from an off-platform database to MySQL for PCF v2.x.
 + Migrating from one availability zone (AZ) to another.
+
+### <a id='how'></a>How the migrate Command Works
+
+The `migrate` command performs a streaming `mysqldump` and restore to migrate
+data from your source MySQL database to a target MySQL for PCF v2 instance. This
+command skips the following system schemas:
+
+- `cf_metadata`
+- `information_schema`
+- `mysql`
+- `performance_schema`
+- `sys`
+
+Additionally, the migration skips MySQL stored routines, events, and triggers.
+Users must migrate these types of data manually.
+
+The `migrate` command creates a new MySQL for PCF v2 instance in the target space,
+and gives it the same name as the source MySQL service instance name.
+
+The command also appends `-old` to the source service instance name, whether it is another PCF MySQL service instance or a user-provided service created locally
+to help migrate an off-platform database.
 
 ## <a id='prepare'></a>Prerequisites
 
@@ -51,7 +72,7 @@ To perform the procedures in this topic, you must have the following:
 
 ### <a id='sizing'></a>Resource Planning
 
-To begin, make sure the MySQL for PCF v2 service plan that you use for your
+Make sure the MySQL for PCF v2 service plan that you use for your
 migration target has your preferred VM type and persistent disk size. When there is not enough space on disk to store the data, migration fails.
 
 The service plan that you select for your target service instance should have a persistent disk that is:
@@ -66,10 +87,10 @@ Do a test migration with small datasets to estimate how long the entire migratio
 
 ## <a id='install-plugin'></a>Install the mysql-tools CF CLI Plugin
 
-Operators and Developers should use the `mysql-tools` CF CLI plugin to migrate
+Pivotal recommends that operators and developers use the `mysql-tools` cf CLI plugin to migrate
 data from a source MySQL database to a MySQL for PCF v2.x service instance.
 
-Do the following to install the `mysql-tools` CF CLI plugin:
+Do the following to install the `mysql-tools` cf CLI plugin:
 
 1. Run the following command:
 
@@ -96,23 +117,6 @@ Do the following to install the `mysql-tools` CF CLI plugin:
        cf mysql-tools migrate [-h] [--no-cleanup] &lt;v1-service-instance&gt; &lt;plan-type&gt;
        cf mysql-tools version
     </pre>
-
-The `migrate` command will perform a streaming mysqldump and restore to migrate
-data from your source MySQL database to a target MySQL for PCF v2 instance. This
-command will skip the following system schemas:
-
-- `cf_metadata`
-- `information_schema`
-- `mysql`
-- `performance_schema`
-- `sys`
-
-Additionally, the migration will skip MySQL stored routines, events, and triggers.
-Users must migrate these types of data manually.
-
-The `migrate` command gives the target MySQL for PCF v2 instance the same name
-as the source MySQL service instance name. It appends `-old` to the source
-service instance name.
 
 ### <a id='security'></a>Security
 
@@ -156,17 +160,17 @@ The `migrate` command must be able to access the source database.
 How you enable this access depends on where the source database is located relative to the target, as follows:
 
 * **Migrating Within an Org and Space**: The `migrate` command can access the source without any preparation.
-Continue to [Migrate Data](#migrate-data), below.
+Continue to [Migrate Data](#migrate-data).
 * **Migrating Across Spaces**: If the source database is in a different space from the target,
-you can enable access through service-instance sharing, as described in [Source Access Across Spaces](#across-spaces).
+enable access through service-instance sharing, as described in [Source Access Across Spaces](#across-spaces), below.
 * **Migrating from Off-Platform**: If the source database is in a different PCF foundation from the target, or not on any PCF foundation,
-you can create a user-provided service that accesses the remote database,
-as described in [Source Access Off-Platform](#off-platform).
+create a user-provided service that accesses the remote database,
+as described in [Source Access Off-Platform](#off-platform), below.
 
 ### <a id='across-spaces'></a>Source Access Across Spaces
 
 If your source MySQL service instance is in a different development space from your target org and space,
-you can migrate your data by enabling service instance sharing for the source.
+you can migrate your data by enabling service instance sharing for the source database.
 
 <p class="note"><strong>Note</strong>: If you are using PCF v2.3 or later,
   service instance sharing for MySQL for PCF v2 is enabled by default. If you
@@ -203,27 +207,22 @@ After verifying that your source database service instance is in the `cf service
 If your source MySQL database is in a different PCF foundation, or not deployed
 on PCF at all,
 you can migrate your data by creating a local user-provided service instance that can access the database.
+
 For more information on user-provided
 service instances, see
-[User-Provided Service Instances](https://docs.pivotal.io/pivotalcf/2-4/devguide/services/user-provided.html)
+[User-Provided Service Instances](https://docs.pivotal.io/pivotalcf/devguide/services/user-provided.html).
 
-To create a user-provided service instance to access the database off-platform, do the following:
+To create a user-provided service instance to access the off-platform database, do the following:
 
 1. Ensure your off-platform MySQL database allows inbound and outbound network
     traffic to your target PCF foundation. You may need to modify firewall rules
-    for your off-platform MySQL. Talk to your Operator for assistance.
+    for your off-platform MySQL. Talk to your platform operator for assistance.
 1. If your off-platform MySQL database requires connections over TLS, make sure
     that your PCF foundation is configured to recognize the CA that the MySQL server
     certificate is signed with.
-1. Verify that you can access the source service instance from the target Org/Space.
-   First, run the following command to target your target Org and Space:
-
-    ```
-    cf target -o TARGET_ORG -s TARGET_SPACE
-    ```
 1. Collect the address, credentials, and other values needed to access your off-platform database.  These typically include the following:
-  - `hostname`: Domain name or IP address of off-platform MySQL instance
-  - `name`: Name of database to migrate
+  - `hostname`: Domain name or IP address of the off-platform source database
+  - `name`: Name of source database
   - `username` and `password`: Database account credentials
   - `port`: Typically `3306`
   - `uri`: Query string for database access
@@ -234,8 +233,8 @@ To create a user-provided service instance to access the database off-platform, 
     cf cups CF-DB-INSTANCE -p CREDS-STRUCT
     ```
    Where:
-   * `CF-DB-INSTANCE` is the name of the database service instance you want to migrate to.
-   * `CREDS-STRUCT` is a JSON structure containing the off-platform database access values above.
+   * `CF-DB-INSTANCE` is the name that you want to give to the new database service instance that you are migrating to.
+   * `CREDS-STRUCT` is a JSON structure that contains the off-platform database access values above.
    <br><br>
    For example:
    <pre class="terminal noselect">
@@ -255,48 +254,55 @@ After seeing that your user-provided service instance was created, continue to [
 
 Once your source database is accessible to your destination space, perform the following steps to migrate your data:
 
-1. Stop and unbind all apps that are sending traffic to the source MySQL service
-   instance by running the following command for each app:
+1. If your source MySQL service instance is running on PCF, stop all traffic
+to the service instance by doing the following for each app bound to the instance:
+   
+    <p class="note"><strong>Note</strong>: To retrieve a list of bound apps, run <code>cf services</code> and see the <code>bound apps</code> column.</p>
 
-    ```
-    cf stop APP
-    ```
-   Where `APP` is the name of your app.
-   <br><br>
-   For example:
-   <pre class="terminal">
-   $ cf stop my-app
-   Stopping app my-app in org my-org / space my-space as user<span>@</span>example.com...
-   OK </pre>
-   To retrieve a list of bound apps, run `cf services`.
+    1. Stop the app by running the following command:
 
-1. Unbind your app from the MySQL for PCF service instance.
-Run the following command for each app bound to the instance:
+        ```
+        cf stop APP
+        ```
 
-    ```
-    cf unbind-service APP SOURCE-INSTANCE
-    ```
-    Where:
-    * `APP` is the name of your app.
-    * `SOURCE-INSTANCE` is the name of your source MySQL for PCF service instance.
-    <br><br>
-    For example:
-    <pre class="terminal">
-    $ cf unbind-service my-app my-instance
-    Unbinding app my-app from service my-instance in org my-org / space my-space as user<span>@</span>example.com...
-    OK
-    </pre>
-1. Use the plugin to migrate your data.
-  Run the following command:
+        Where `APP` is the name of your app.
+        <br><br>
+        For example:
+        <pre class="terminal">
+        $ cf stop my-app
+        Stopping app my-app in org my-org / space my-space as user<span>@</span>example.com...
+        OK </pre>
+
+   1. Unbind the app by running the following command:
+
+        ```
+        cf unbind-service APP SOURCE-INSTANCE
+        ```
+        Where:
+        * `APP` is the name of your app.
+        * `SOURCE-INSTANCE` is the name of your source MySQL for PCF service instance.
+        <br><br>
+        For example:
+        <pre class="terminal">
+        $ cf unbind-service my-app my-instance
+        Unbinding app my-app from service my-instance in org my-org / space my-space as user<span>@</span>example.com...
+        OK
+        </pre>
+
+1. Choose a service plan for your target MySQL for PCF v2 instance.
+For example, `db-small`.
+  - To view available MySQL for PCF v2 service plans, run `cf marketplace` and
+  refer to the plans under `p.mysql`.
+
+1. Migrate your data by running the following command:
 
     ```
     cf mysql-tools migrate SOURCE-INSTANCE V2-PLAN
     ```
     Where:
-    * `SOURCE-INSTANCE` is the name of your source MySQL service instance.
-    * `V2-PLAN` is the name of the MySQL for PCF v2 service plan to use for the new MySQL for PCF v2 service instance.
-    For example, `db-small`.
-    To view available MySQL for PCF v2 service plans, run `cf marketplace` and locate the plans under `p.mysql`.
+    * `SOURCE-INSTANCE` is the name of your source MySQL service instance,
+     or user-provided service instance.
+    * `V2-PLAN` is the name of the service plan that you chose above.
 
 ## <a id='validate-data'></a>Validate Data
 
